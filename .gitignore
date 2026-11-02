@@ -1,0 +1,17 @@
+# Third-party clone with local edits (see TORCHLEET-README.md). Has its own .git.
+Torchleet/
+
+# Local tool settings
+.claude/
+
+# Python / Jupyter
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.venv/
+venv/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store

@@ -1,0 +1,669 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "LLM Inference and Architecture Notes",
+  "version": "1.6.0",
+  "lastUpdated": "2026-10-12",
+  "description": "Chapter-based notes covering LLM inference (prefill/decode, KV cache, cross-model KV transfer, memory, bandwidth, GPU sizing, quantization) and modern transformer architecture (GPT-2 → Kimi K3, attention variants, CoPE, KDA, LoRA, distillation) and JEPA representation learning (I-JEPA, stopgrad, EMA). Use the chapters array for sequential reading or the topics index for lookup by concept.",
+  "structure": {
+    "root": ".",
+    "chaptersDir": "chapters/",
+    "indexFile": "index.json",
+    "readmeFile": "README.md"
+  },
+  "chapters": [
+    {
+      "id": "00",
+      "file": "chapters/00-glossary.md",
+      "title": "Glossary: Abbreviations, Symbols, and Terms",
+      "summary": "Reference tables for all abbreviations, symbols, math signs, and the operations-bytes-intensity-time relationships used throughout the other chapters.",
+      "topics": [
+        "abbreviations",
+        "symbols",
+        "units",
+        "FLOP",
+        "HBM",
+        "VRAM",
+        "MHA",
+        "GQA",
+        "MQA",
+        "MoE"
+      ],
+      "readTime": "5 min",
+      "prerequisites": [],
+      "nextChapter": "01"
+    },
+    {
+      "id": "01",
+      "file": "chapters/01-inference-overview.md",
+      "title": "Inference Overview: Prefill vs Decode, Compute vs Memory",
+      "summary": "The two-phase model (prefill, decode), the four-quadrant bottleneck table, compute-bound vs memory-bound definitions, the prefill/decode side-by-side comparison, and the compact mental model.",
+      "topics": [
+        "prefill",
+        "decode",
+        "compute-bound",
+        "memory-bound",
+        "arithmetic intensity",
+        "TTFT",
+        "TPOT"
+      ],
+      "readTime": "8 min",
+      "prerequisites": [
+        "00"
+      ],
+      "nextChapter": "02"
+    },
+    {
+      "id": "02",
+      "file": "chapters/02-prefill-decode-mechanics.md",
+      "title": "Prefill and Decode Mechanics",
+      "summary": "Why prefill is compute-bound and decode is memory-bound, how the KV cache changes the trade-off, the exact prompt-to-autoregressive-decode lifecycle, how subword/byte tokenization generates names absent as whole vocabulary tokens, and the 7B FP16 worked example.",
+      "topics": [
+        "prefill",
+        "decode",
+        "KV cache",
+        "KV-cache lifecycle",
+        "autoregressive generation",
+        "tokenization",
+        "subword tokens",
+        "byte fallback",
+        "LM head",
+        "FlashAttention",
+        "batch size"
+      ],
+      "readTime": "16 min",
+      "prerequisites": [
+        "01"
+      ],
+      "nextChapter": "03"
+    },
+    {
+      "id": "03",
+      "file": "chapters/03-batching-scheduling.md",
+      "title": "Batching, Scheduling, and vLLM",
+      "summary": "Why batching helps decode, continuous batching and vLLM internals, plus detailed PagedAttention and KV-block allocation: fragmentation, logical-to-physical block tables, address translation, numerical allocation, why Python's apparent automatic growth does not resize GPU tensors freely, free lists versus prefix hashes, prefill/decode lifecycle, block-size tradeoffs, and related optimizations.",
+      "topics": [
+        "batching",
+        "continuous batching",
+        "vLLM",
+        "scheduler",
+        "PagedAttention",
+        "KV-block allocation",
+        "prefix caching",
+        "chunked prefill",
+        "speculative decoding",
+        "latency",
+        "throughput"
+      ],
+      "readTime": "28 min",
+      "prerequisites": [
+        "02"
+      ],
+      "nextChapter": "04"
+    },
+    {
+      "id": "04",
+      "file": "chapters/04-memory-planning.md",
+      "title": "Memory Planning: Weights, KV Cache, and Runtime",
+      "summary": "GB vs GiB units, the P × s_w weight formula, the 2·N_l·N_kv·d_h·s_kv per-token KV-cache formula, MHA vs GQA vs MQA, the 8B-class GQA worked example, and the full VRAM planning equation (weights + KV + activations + runtime + headroom).",
+      "topics": [
+        "VRAM",
+        "KV cache",
+        "model weights",
+        "MoE",
+        "MHA",
+        "GQA",
+        "MQA",
+        "memory planning",
+        "quantization"
+      ],
+      "readTime": "15 min",
+      "prerequisites": [
+        "00",
+        "02"
+      ],
+      "nextChapter": "05"
+    },
+    {
+      "id": "05",
+      "file": "chapters/05-compute-flops.md",
+      "title": "Compute and FLOPs",
+      "summary": "Why matrix multiplication costs ≈2mkn FLOPs, why a dense LLM costs ≈2P FLOPs per token, prefill/decode FLOPs formulas, the VRAM-to-compute memory hierarchy (HBM → L2 → shared memory → registers), the 438 MB-per-layer illustration, and CUDA cores vs Tensor Cores.",
+      "topics": [
+        "FLOPs",
+        "2P rule",
+        "matmul",
+        "CUDA cores",
+        "Tensor Cores",
+        "memory hierarchy",
+        "weight offloading"
+      ],
+      "readTime": "15 min",
+      "prerequisites": [
+        "04"
+      ],
+      "nextChapter": "06"
+    },
+    {
+      "id": "06",
+      "file": "chapters/06-bandwidth-roofline.md",
+      "title": "Bandwidth, Arithmetic Intensity, and the Roofline",
+      "summary": "Memory bandwidth vs FLOP/s, the GPU ops:byte ratio, the small-processor worked example (A/B/C workloads), the H100 295 FLOP/byte example, how batching and quantization shift intensity, and how FLOPs/byte bounds the number of users served.",
+      "topics": [
+        "bandwidth",
+        "arithmetic intensity",
+        "roofline",
+        "ops:byte",
+        "HBM",
+        "FLOPs/byte"
+      ],
+      "readTime": "18 min",
+      "prerequisites": [
+        "05"
+      ],
+      "nextChapter": "07"
+    },
+    {
+      "id": "07",
+      "file": "chapters/07-gpu-sizing.md",
+      "title": "Choosing a GPU Systematically",
+      "summary": "8-step procedure (define workload → read config → check VRAM → check prefill compute → check decode bandwidth → check software → check multi-GPU → benchmark), how inference engineers use architecture knowledge for model selection, the GPU-property priority table, and the compact sizing worksheet.",
+      "topics": [
+        "GPU selection",
+        "model selection",
+        "architecture selection",
+        "serving engine",
+        "kernel support",
+        "VRAM",
+        "bandwidth",
+        "multi-GPU",
+        "tensor parallelism",
+        "pipeline parallelism",
+        "benchmarking"
+      ],
+      "readTime": "12 min",
+      "prerequisites": [
+        "04",
+        "05",
+        "06"
+      ],
+      "nextChapter": "08"
+    },
+    {
+      "id": "08",
+      "file": "chapters/08-quantization.md",
+      "title": "Quantization",
+      "summary": "Why quantization speeds up decode (bytes transferred per parameter), the FP32/FP16/FP8/INT8/INT4 table, the two caveats (metadata overhead, KV cache is separate), and how quantization shifts the roofline.",
+      "topics": [
+        "quantization",
+        "FP16",
+        "INT8",
+        "INT4",
+        "KV cache quantization"
+      ],
+      "readTime": "5 min",
+      "prerequisites": [
+        "04",
+        "06"
+      ],
+      "nextChapter": "09"
+    },
+    {
+      "id": "09",
+      "file": "chapters/09-architecture-evolution.md",
+      "title": "From GPT-2 to Kimi K3",
+      "summary": "The original article by @waterloo_intern tracing the architectural evolution: GPT-2 → Linear Attention → DeltaNet → Gated DeltaNet → KDA → Kimi Linear → Kimi K3, plus AttnRes and the MoE details.",
+      "topics": [
+        "GPT-2",
+        "linear attention",
+        "DeltaNet",
+        "Gated DeltaNet",
+        "KDA",
+        "Kimi Linear",
+        "Kimi K3",
+        "Mamba",
+        "AttnRes",
+        "MoE"
+      ],
+      "readTime": "30 min",
+      "prerequisites": [],
+      "nextChapter": "10"
+    },
+    {
+      "id": "10",
+      "file": "chapters/10-modern-attention.md",
+      "title": "Modern Attention: MHA to KDA",
+      "summary": "Companion notes: Q/K/V intuition, multi-head reshaping, detailed absolute/relative/RoPE mathematics, and a complete CoPE reference covering tensor shapes, learned gate-key projections, a numerical sigmoid-gate example, contextual-position matrices, pmax, efficient QE interpolation, training, gate variants and their KV-cache tradeoffs, prefill/decode execution, complexity, empirical scope, and limitations; followed by MHA/MQA/GQA/MLA, FlashAttention, linear attention, KDA, hybrid attention, and architecture selection.",
+      "topics": [
+        "attention",
+        "position encoding",
+        "relative position",
+        "RoPE",
+        "RoPE scaling",
+        "Contextual Position Encoding",
+        "CoPE",
+        "CoPE gates",
+        "contextual distance",
+        "position interpolation",
+        "pmax",
+        "MHA",
+        "MQA",
+        "GQA",
+        "MLA",
+        "FlashAttention",
+        "linear attention",
+        "DeltaNet",
+        "KDA",
+        "hybrid attention",
+        "architecture selection"
+      ],
+      "readTime": "72 min",
+      "prerequisites": [
+        "09"
+      ],
+      "nextChapter": "11"
+    },
+    {
+      "id": "11",
+      "file": "chapters/11-training-adaptation.md",
+      "title": "Training and Adaptation: LoRA, QLoRA, Distillation",
+      "summary": "Companion notes: LoRA (frozen base + low-rank adapter), QLoRA (4-bit base + higher-precision adapter), the r·(d_in + d_out) parameter formula, distillation vs LoRA distinction (target vs parameters), response vs KL distillation, and gradient averaging across large global batches.",
+      "topics": [
+        "LoRA",
+        "QLoRA",
+        "distillation",
+        "fine-tuning",
+        "gradient accumulation",
+        "KL divergence"
+      ],
+      "readTime": "12 min",
+      "prerequisites": [],
+      "nextChapter": "12"
+    },
+    {
+      "id": "12",
+      "file": "chapters/12-cross-model-kv-transfer.md",
+      "title": "Cross-Model KV-Cache Transfer",
+      "summary": "NVIDIA research on reusing a smaller related model's prefilled KV cache in a larger receiver through a pair-specific, closed-form ridge mapper: cross-layer source selection, RoPE-aware key mapping, limits, calibration cost, quality retention, and serving implications.",
+      "topics": [
+        "cross-model KV transfer",
+        "KV cache",
+        "prefill reuse",
+        "model cascading",
+        "ridge regression",
+        "RoPE",
+        "cost-quality routing"
+      ],
+      "readTime": "12 min",
+      "prerequisites": [
+        "02",
+        "04",
+        "10"
+      ],
+      "nextChapter": "13"
+    },
+    {
+      "id": "13",
+      "file": "chapters/13-jepa.md",
+      "title": "JEPA: Predicting Embeddings and Understanding Stopgrad",
+      "summary": "JEPA and I-JEPA intuition, context encoder/predictor/target encoder, masked embedding prediction, loss notation, stopgrad forward and backward behavior with a numerical example and PyTorch detach, EMA target updates, and representation collapse.",
+      "topics": [
+        "JEPA",
+        "I-JEPA",
+        "self-supervised learning",
+        "embeddings",
+        "stopgrad",
+        "detach",
+        "EMA",
+        "representation collapse"
+      ],
+      "readTime": "8 min",
+      "prerequisites": [],
+      "nextChapter": null
+    }
+  ],
+  "topics": {
+    "prefill": [
+      "01",
+      "02",
+      "05"
+    ],
+    "decode": [
+      "01",
+      "02",
+      "05",
+      "06"
+    ],
+    "kv-cache": [
+      "00",
+      "02",
+      "04",
+      "10",
+      "12"
+    ],
+    "cross-model-kv-transfer": [
+      "12"
+    ],
+    "prefill-reuse": [
+      "03",
+      "12"
+    ],
+    "model-cascading": [
+      "12"
+    ],
+    "cost-quality-routing": [
+      "12"
+    ],
+    "ridge-regression": [
+      "12"
+    ],
+    "kv-cache-lifecycle": [
+      "02"
+    ],
+    "autoregressive-generation": [
+      "02",
+      "10"
+    ],
+    "tokenization": [
+      "02"
+    ],
+    "subword-tokens": [
+      "02"
+    ],
+    "byte-fallback": [
+      "02"
+    ],
+    "lm-head": [
+      "02",
+      "10"
+    ],
+    "compute-bound": [
+      "01",
+      "02",
+      "06"
+    ],
+    "memory-bound": [
+      "01",
+      "02",
+      "06"
+    ],
+    "batching": [
+      "02",
+      "03",
+      "06"
+    ],
+    "vllm": [
+      "03"
+    ],
+    "paged-attention": [
+      "03"
+    ],
+    "kv-block-allocation": [
+      "03"
+    ],
+    "prefix-caching": [
+      "03"
+    ],
+    "chunked-prefill": [
+      "03"
+    ],
+    "speculative-decoding": [
+      "03"
+    ],
+    "vram": [
+      "04",
+      "05",
+      "07"
+    ],
+    "model-weights": [
+      "04",
+      "05"
+    ],
+    "memory-hierarchy": [
+      "05"
+    ],
+    "cuda-cores": [
+      "05"
+    ],
+    "tensor-cores": [
+      "05",
+      "07"
+    ],
+    "flops": [
+      "05",
+      "06"
+    ],
+    "arithmetic-intensity": [
+      "01",
+      "06"
+    ],
+    "roofline": [
+      "06"
+    ],
+    "bandwidth": [
+      "05",
+      "06",
+      "07"
+    ],
+    "hbm": [
+      "00",
+      "04",
+      "05",
+      "06",
+      "07"
+    ],
+    "ops-byte": [
+      "06"
+    ],
+    "gpu-selection": [
+      "07"
+    ],
+    "model-selection": [
+      "07",
+      "10"
+    ],
+    "architecture-selection": [
+      "07",
+      "10"
+    ],
+    "serving-engine": [
+      "03",
+      "07"
+    ],
+    "kernel-support": [
+      "07",
+      "10"
+    ],
+    "multi-gpu": [
+      "07"
+    ],
+    "tensor-parallelism": [
+      "07"
+    ],
+    "pipeline-parallelism": [
+      "07"
+    ],
+    "quantization": [
+      "04",
+      "08"
+    ],
+    "kv-cache-quantization": [
+      "04",
+      "08"
+    ],
+    "mha": [
+      "00",
+      "04",
+      "10"
+    ],
+    "position-encoding": [
+      "10"
+    ],
+    "relative-position": [
+      "10"
+    ],
+    "rope": [
+      "10"
+    ],
+    "rope-scaling": [
+      "10"
+    ],
+    "contextual-position-encoding": [
+      "10"
+    ],
+    "cope": [
+      "10"
+    ],
+    "cope-gates": [
+      "10"
+    ],
+    "contextual-distance": [
+      "10"
+    ],
+    "position-interpolation": [
+      "10"
+    ],
+    "pmax": [
+      "10"
+    ],
+    "gqa": [
+      "00",
+      "04",
+      "10"
+    ],
+    "mqa": [
+      "00",
+      "04",
+      "10"
+    ],
+    "mla": [
+      "09",
+      "10"
+    ],
+    "flashattention": [
+      "02",
+      "10"
+    ],
+    "linear-attention": [
+      "09",
+      "10"
+    ],
+    "deltanet": [
+      "09",
+      "10"
+    ],
+    "gated-deltanet": [
+      "09",
+      "10"
+    ],
+    "kda": [
+      "09",
+      "10"
+    ],
+    "mamba": [
+      "09"
+    ],
+    "moe": [
+      "00",
+      "04",
+      "07",
+      "09"
+    ],
+    "attnres": [
+      "09"
+    ],
+    "kimi-k3": [
+      "09"
+    ],
+    "kimi-linear": [
+      "09"
+    ],
+    "gpt-2": [
+      "09"
+    ],
+    "lora": [
+      "11"
+    ],
+    "qlora": [
+      "11"
+    ],
+    "distillation": [
+      "11"
+    ],
+    "fine-tuning": [
+      "11"
+    ],
+    "gradient-accumulation": [
+      "11"
+    ],
+    "kl-divergence": [
+      "11"
+    ],
+    "jepa": [
+      "13"
+    ],
+    "i-jepa": [
+      "13"
+    ],
+    "self-supervised-learning": [
+      "13"
+    ],
+    "embeddings": [
+      "13"
+    ],
+    "stopgrad": [
+      "13"
+    ],
+    "detach": [
+      "13"
+    ],
+    "ema": [
+      "13"
+    ],
+    "representation-collapse": [
+      "13"
+    ]
+  },
+  "sources": {
+    "llm-inference-prefill-decode-notes.md": {
+      "contributedTo": [
+        "00",
+        "01",
+        "02",
+        "03",
+        "04",
+        "05",
+        "06",
+        "07",
+        "08"
+      ]
+    },
+    "xtract-@waterloo_intern.md": {
+      "contributedTo": [
+        "09",
+        "10",
+        "11"
+      ]
+    },
+    "arXiv:2608.03893": {
+      "title": "Cross-Model KV Cache Transfer in LLM Families: A Closed-Form Linear Mapping for Prefill Reuse",
+      "url": "https://arxiv.org/abs/2608.03893",
+      "contributedTo": [
+        "12"
+      ]
+    },
+    "arXiv:2301.08243": {
+      "title": "Self-Supervised Learning from Images with a Joint-Embedding Predictive Architecture",
+      "url": "https://arxiv.org/abs/2301.08243",
+      "contributedTo": [
+        "13"
+      ]
+    }
+  },
+  "metadata": {
+    "totalChapters": 14,
+    "estimatedTotalReadTime": "256 min",
+    "primarySource": "llm-inference-prefill-decode-notes.md",
+    "secondarySource": "xtract-@waterloo_intern.md",
+    "maintainedBy": "delin"
+  }
+}
